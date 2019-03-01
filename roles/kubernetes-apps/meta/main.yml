@@ -50,3 +50,10 @@ dependencies:
       - inventory_hostname == groups['kube-master'][0]
     tags:
       - oci
+
+  - role: kubernetes-apps/cloud_controller/aliyun
+    when:
+      - cloud_provider is defined
+      - cloud_provider == "aliyun"
+    tags:
+      - aliyun

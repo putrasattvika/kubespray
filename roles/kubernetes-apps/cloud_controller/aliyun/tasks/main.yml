@@ -1,0 +1,40 @@
+# Install and configure Aliyun Cloud Controller Manager on master nodes
+#
+# Source: https://github.com/kubernetes/cloud-provider-alibaba-cloud/blob/master/docs/getting-started.md
+---
+
+- block:
+  - name: "Aliyun Cloud Controller | Get Cluster CA for CCM Kubeconfig"
+    slurp:
+      src: "{{ kube_cert_dir }}/ca.crt"
+    register: aliyun_cluster_ca
+
+  - name: "Aliyun Cloud Controller | Generate CCM Kubeconfig"
+    template:
+      src: controller-manager-config.yml.j2
+      dest: "{{ aliyun_ccm_config_path }}"
+
+  when: inventory_hostname in groups['kube-master']
+  tags: aliyun
+
+- block:
+  - name: "Aliyun Cloud Controller | Update Aliyun Credentials in configmap"
+    shell: |
+      {{ bin_dir }}/kubectl --namespace kube-system create configmap aliyun-cloud-configx \
+        --from-literal=special.keyid="{{ aliyun_access_key_id }}" \
+        --from-literal=special.keysecret="{{ aliyun_access_key_secret}}" \
+        -o yaml --dry-run | {{ bin_dir }}/kubectl apply -f -
+
+  - name: "Aliyun Cloud Controller | Generate CCM Manifest"
+    template:
+      src: controller-manifest.yml.j2
+      dest: /tmp/aliyun-controller-manifest.yml
+
+  - name: "Aliyun Cloud Controller | Apply CCM Manifest"
+    kube:
+      kubectl: "{{ bin_dir }}/kubectl"
+      filename: /tmp/aliyun-controller-manifest.yml
+      state: latest
+
+  when: inventory_hostname == groups['kube-master'][0]
+  tags: aliyun
